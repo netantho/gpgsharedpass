@@ -19,15 +19,15 @@ while test $# -gt 0; do
 			break
 			;;
 		--summary)
-			find . -type file -name \*.gpg -print > files
+			find . -type file -name \*.gpg -print > .files.tmp
 			while read line
 			do
 				echo $line
 				gpg --status-fd 1 --list-only -vv $line
 				gpg --verify ${line%.*}.sig $line
 				echo ""
-			done < files
-			$SHRED files
+			done < .files.tmp
+			$SHRED .files.tmp
 			break
 			;;
 		--add-file)
@@ -43,6 +43,39 @@ while test $# -gt 0; do
                         fi
                         break
                         ;;
+		--cat)
+                        if [ $# -gt 1 ]
+                        then
+				gpg --verify ${2%.*}.sig $2
+				gpg --decrypt $2
+                        else
+                                echo "Error: --cat <myfile.gpg>"
+                        fi
+                        break
+                        ;;
+		--add-key)
+                        if [ $# -gt 3 ]
+                        then
+                                gpg --verify ${4%.*}.sig $3
+				gpg --list-only -vv $4 2>> .list.tmp
+				sed -n 's/.*public key is \(.*\).*/\1/p' .list.tmp > .keys.tmp
+				echo $2 >> .keys.tmp
+				$SHRED ${4%.*}.sig .list.tmp
+				RECPT=""
+                        	while read line
+                        	do
+                                	RECPT="$RECPT -r $line"
+                        	done < .keys.tmp
+				echo $RECPT
+				gpg --decrypt $4 > ${4%.*}
+				gpg `echo $RECPT`  --encrypt ${4%.*}
+				gpg --output ${4%.*}.sig -u $3 --detach-sign $4
+				$SHRED .keys.tmp ${4%.*}
+                        else
+                                echo "Error: --add-key <other@example.com> <me@example.com> <myfile.gpg>"
+                        fi
+			break
+			;;
 		*)
                         echo "GPG Shared Password Manager"
 			echo "Anthony Verez (netantho) <netantho@nextgenlabs.net>"
