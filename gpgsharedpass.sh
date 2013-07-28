@@ -96,31 +96,48 @@ while test $# -gt 0; do
                         if [ $# -gt 2 ]
                         then
                                 gpg --verify ${3%.*}.sig $3
-				gpg --list-only -vv $4 2>> .list.tmp
+				gpg --list-only -vv $3 2>> .list.tmp
                                 sed -n 's/.*public key is \(.*\).*/\1/p' .list.tmp > .keys.tmp
-                                $SHRED ${4%.*}.sig .list.tmp
+                                $SHRED .list.tmp
                                 RECPT=""
                                 while read line
                                 do
                                         RECPT="$RECPT -r $line"
                                 done < .keys.tmp
-                                gpg --decrypt $4 > ${4%.*}
-                                gpg `echo $RECPT`  --encrypt ${4%.*}
-				$SHRED ${4%.*}.sig .list.tmp
+                                gpg --decrypt $3 > ${3%.*}
+				shasum ${3%.*} > .shasum.tmp
+				echo "The file has been decrypted"
+				echo "Press [Enter] to encrypt it again and delete the decrypted file"
+				echo "A new signature and a new commit will be done if the file has changed"
+				# stop
+				read -p ""
+				shasum ${3%.*} > .shasum.new.tmp
+				if [ "`cmp ".shasum.new.tmp" ".shasum.tmp"`" != "" ]
+				then
+                                	gpg `echo $RECPT`  --encrypt ${3%.*}
+					$SHRED ${3%.*}.sig
+                                	gpg --output ${3%.*}.sig -u $2 --detach-sign $3
+                                	$SHRED .keys.tmp
+                                	git add ${3%.*}.sig $3
+                                	git commit
+				fi
+                                $SHRED ${3%.*} .shasum.tmp .shasum.new.tmp
                         else
-                                echo "Error: --cat <myfile.gpg>"
+                                echo "Error: --decrypt <me@example.com> <mysecretfile.gpg>"
                         fi
 			break;;
 		*)
                         echo "GPG Shared Password Manager"
 			echo "Anthony Verez (netantho) <netantho@nextgenlabs.net>"
                         echo " "
-                        echo "-h, --help        					show brief help"
-                        echo "--summary	<mysecretfolder>			show a summary of permissions on a folder"
-			echo "--cat <myfile.gpg>					display the decrypted content of myfile.gpg"
-			echo "--store <myfile.gpg>					temporary store myfile"
-			echo "--list <myfile.gpg>					show permissions on a file"
-			echo "--add-key	<alice@example.com> <myfile.gpg>	encrypt a file with adding a new key"
+                        echo "-h, --help        						Show brief help"
+                        echo "--summary <dir>							Who has access to which file and last edited them"
+			echo "--list <myfile.gpg>						List security information about an encrypted file including permissions"
+			echo "--cat <myfile.gpg>						Display the content of an encrypted file"
+			echo "--decrypt <me@example.com> <myfile.gpg>				Decrypt an encrypted file, wait for the user when they're finished and re-encrypt if the file was modified"
+			echo "--add-file <me@example.com> <myfile>				Encrypt a file and add it to the repo"
+			echo "--add-key <other@example.com> <me@example.com> <myfile.gpg>	Reencrypt a file adding a new recipient"
+			echo "--scan <dir>							Scan a directory for non .sig or .gpg files"
                         exit 0
                         ;;
         esac

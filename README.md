@@ -1,8 +1,8 @@
 Management of multi-user secret files with GPG 
 
 
-Planned features
-----------------
+Features
+--------
 
 * Password management using GPG over git
 	* encryption
@@ -14,5 +14,14 @@ Planned features
 	* --decrypt me@example.com mysecretfile.gpg: decrypt an encrypted file, wait for the user when they're finished and re-encrypt if the file was modified
 	* --add-file me@example.com mysecretfile: Encrypt a file and add it to the repo
 	* --add-key other@example.com me@example.com mysecretfile.gpg: Re-encrypt a file adding a new recipient
-	* --scan dir: Scan for non .sig or .gpg files
+	* --scan dir: Scan a directory for non .sig or .gpg files
+
+Todo
+----
+
+* Add configuration files for each secret repo
+	* init command to create them
+	* my recipient address
+	* default recipients addresses to encrypt the files with
+* Actions on directories
 
