@@ -18,16 +18,30 @@ while test $# -gt 0; do
 			fi
 			break
 			;;
+		--scan)
+                        if [ $# -gt 1 ]
+                        then
+				find $2 -path ./.git -prune -o ! -name '*.gpg' ! -name '*.sig' -type f -print
+			else
+				echo "Error: --scan <dir>"
+			fi
+			break
+			;;
 		--summary)
-			find . -type file -name \*.gpg -print > .files.tmp
-			while read line
-			do
-				echo $line
-				gpg --status-fd 1 --list-only -vv $line
-				gpg --verify ${line%.*}.sig $line
-				echo ""
-			done < .files.tmp
-			$SHRED .files.tmp
+			if [ $# -gt 1 ]
+			then
+				find . -type file -name '*.gpg' -print > .files.tmp
+				while read line
+				do
+					echo $line
+					gpg --list-only -vv $line
+					gpg --verify ${line%.*}.sig $line
+					echo ""
+				done < .files.tmp
+				$SHRED .files.tmp
+			else
+				echo "Error: --summary <dir>"
+			fi
 			break
 			;;
 		--add-file)
@@ -39,7 +53,7 @@ while test $# -gt 0; do
 				git commit
 				$SHRED $3
                         else
-                                echo "Error: --add-file <mail@example.com> <myfile>"
+                                echo "Error: --add-file <me@example.com> <myfile>"
                         fi
                         break
                         ;;
@@ -66,16 +80,37 @@ while test $# -gt 0; do
                         	do
                                 	RECPT="$RECPT -r $line"
                         	done < .keys.tmp
-				echo $RECPT
 				gpg --decrypt $4 > ${4%.*}
 				gpg `echo $RECPT`  --encrypt ${4%.*}
 				gpg --output ${4%.*}.sig -u $3 --detach-sign $4
-				$SHRED .keys.tmp ${4%.*}
+				$SHRED .keys.tmp
+				git add ${4%.*}.sig $4
+				git commit
+				$SHRED ${4%.*}
                         else
                                 echo "Error: --add-key <other@example.com> <me@example.com> <myfile.gpg>"
                         fi
 			break
 			;;
+		--decrypt)
+                        if [ $# -gt 2 ]
+                        then
+                                gpg --verify ${3%.*}.sig $3
+				gpg --list-only -vv $4 2>> .list.tmp
+                                sed -n 's/.*public key is \(.*\).*/\1/p' .list.tmp > .keys.tmp
+                                $SHRED ${4%.*}.sig .list.tmp
+                                RECPT=""
+                                while read line
+                                do
+                                        RECPT="$RECPT -r $line"
+                                done < .keys.tmp
+                                gpg --decrypt $4 > ${4%.*}
+                                gpg `echo $RECPT`  --encrypt ${4%.*}
+				$SHRED ${4%.*}.sig .list.tmp
+                        else
+                                echo "Error: --cat <myfile.gpg>"
+                        fi
+			break;;
 		*)
                         echo "GPG Shared Password Manager"
 			echo "Anthony Verez (netantho) <netantho@nextgenlabs.net>"
