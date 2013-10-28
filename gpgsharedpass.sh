@@ -47,17 +47,20 @@ while test $# -gt 0; do
 		--add-file)
                         if [ $# -gt 2 ]
                         then
-				gpg -r $2 --encrypt $3
-				gpg --output $3.sig -u $2 --detach-sign $3.gpg
-				git add $3.gpg $3.sig
-				git commit
-				$SHRED $3
+				for file in $(find $3 -type file)
+				do
+					gpg -r $2 --encrypt $file
+					gpg --output $file.sig -u $2 --detach-sign $file.gpg
+					git add $file.gpg $file.sig
+					git commit -m "$file added by $2"
+				done
+				$SHRED $file
                         else
-                                echo "Error: --add-file <me@example.com> <myfile>"
+                                echo "Error: --add-file <me@example.com> <myfile_OR_mydirectory>"
                         fi
                         break
                         ;;
-		--cat)
+	       --cat)
                         if [ $# -gt 1 ]
                         then
 				gpg --verify ${2%.*}.sig $2
@@ -126,6 +129,56 @@ while test $# -gt 0; do
                                 echo "Error: --decrypt <me@example.com> <mysecretfile.gpg>"
                         fi
 			break;;
+		--edit)
+			if [ $# -gt 2 ]
+                        then
+                                gpg --verify ${3%.*}.sig $3
+				gpg --list-only -vv $3 2>> .list.tmp
+                                sed -n 's/.*public key is \(.*\).*/\1/p' .list.tmp > .keys.tmp
+                                $SHRED .list.tmp
+                                RECPT=""
+                                while read line
+                                do
+                                        RECPT="$RECPT -r $line"
+                                done < .keys.tmp
+                                gpg --decrypt $3 > ${3%.*}
+				shasum ${3%.*} > .shasum.tmp
+				echo "The file has been decrypted"
+				echo "Press [Enter] to encrypt it again and delete the decrypted file"
+				echo "A new signature and a new commit will be done if the file has changed"
+				# stop
+				if [ -z "${EDITOR}" ] 
+				then
+					if ! which vim >/dev/null;
+					then
+						if ! which nano >/dev/null;
+						then
+							open ${3%.*}
+						else
+							nano ${3%.*}
+						fi
+					else
+						vim ${3%.*}
+					fi
+				else
+					$EDITOR ${3%.*}
+				fi
+				shasum ${3%.*} > .shasum.new.tmp
+				if [ "`cmp ".shasum.new.tmp" ".shasum.tmp"`" != "" ]
+				then
+                                	gpg `echo $RECPT`  --encrypt ${3%.*}
+					$SHRED ${3%.*}.sig
+                                	gpg --output ${3%.*}.sig -u $2 --detach-sign $3
+                                	$SHRED .keys.tmp
+                                	git add ${3%.*}.sig $3
+                                	git commit
+				fi
+                                $SHRED ${3%.*} .shasum.tmp .shasum.new.tmp
+                        else
+                                echo "Error: --edit <me@example.com> <mysecretfile.gpg>"
+                        fi
+			break;;
+	
 		*)
                         echo "GPG Shared Password Manager"
 			echo "Anthony Verez (netantho) <netantho@nextgenlabs.net>"
@@ -135,7 +188,8 @@ while test $# -gt 0; do
 			echo "--list <myfile.gpg>						List security information about an encrypted file including permissions"
 			echo "--cat <myfile.gpg>						Display the content of an encrypted file"
 			echo "--decrypt <me@example.com> <myfile.gpg>				Decrypt an encrypted file, wait for the user when they're finished and re-encrypt if the file was modified"
-			echo "--add-file <me@example.com> <myfile>				Encrypt a file and add it to the repo"
+			echo "--edit <me@example.com> <myfile.gpg>				Decrypt an encrypted file, open an editor to modify it and re-encrypt if the file was modified"
+			echo "--add-file <me@example.com> <myfile_OR_mydirectory> 		Encrypt all files into a directory and add all to the repo"
 			echo "--add-key <other@example.com> <me@example.com> <myfile.gpg>	Reencrypt a file adding a new recipient"
 			echo "--scan <dir>							Scan a directory for non .sig or .gpg files"
                         exit 0

@@ -23,7 +23,3 @@ Todo
 	* init command to create them
 	* my recipient address
 	* default recipients addresses to encrypt the files with
-* Actions on directories
-* Add an edit action to make it faster to decrypt, edit, [enter]
-* Default commit message
-
